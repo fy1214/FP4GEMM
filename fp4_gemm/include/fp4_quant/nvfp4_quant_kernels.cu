@@ -8,7 +8,7 @@
 
 #include <cuda_fp8.h>
 #include "utils.cuh"
-#include "cuda_utils.h"
+#include "../cuda_utils.h"
 
 #define ELTS_PER_THREAD 8
 

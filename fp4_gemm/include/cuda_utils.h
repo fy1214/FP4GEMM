@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 
+#define HOST_DEVICE_INLINE __host__ __device__ __forceinline__
+
 #define CUDA_CHECK(cmd)                                             \
   do {                                                              \
     cudaError_t e = cmd;                                            \

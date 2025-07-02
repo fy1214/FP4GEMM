@@ -28,3 +28,14 @@ template <>
 struct TypeConverter<__nv_bfloat16> {
   using Type = __nv_bfloat162;
 };
+
+// Define a 16 bytes packed data type.
+template <class Type>
+struct PackedVec {
+  typename TypeConverter<Type>::Type elts[4];
+};
+
+template <>
+struct PackedVec<__nv_fp8_e4m3> {
+  __nv_fp8x2_e4m3 elts[8];
+};

@@ -1,12 +1,12 @@
 import os
-import setuptools
 import shutil
-import subprocess
+from setuptools import Extension, setup
 from setuptools.command.build_py import build_py
 from setuptools.command.develop import develop
+from torch.utils.cpp_extension import CUDAExtension, BuildExtension
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
-jit_include_dirs = ('fp4_gemm/include/fp4_gemm', )
+jit_include_dirs = ('fp4_gemm/include/fp4_gemm', 'fp4_gemm/include/fp4_quant')
 third_party_include_dirs = (
     'third-party/cutlass/include/cute',
     'third-party/cutlass/include/cutlass',
@@ -59,17 +59,43 @@ class CustomBuildPy(build_py):
             shutil.copytree(src_dir, dst_dir)
 
 
-if __name__ == '__main__':
-    # noinspection PyBroadException
-    try:
-        cmd = ['git', 'rev-parse', '--short', 'HEAD']
-        revision = '+' + subprocess.check_output(cmd).decode('ascii').rstrip()
-    except:
-        revision = ''
+ext_modules = []
 
-    setuptools.setup(
+ext_modules.append(CUDAExtension(
+    name="fp4_gemm._C",
+    sources=[
+        "include/fp4_quant.cu",
+        "include/torch_bindings.cpp"
+    ],
+    include_dirs=[],
+    libraries=["m"],  # 链接数学库（如 -lm）
+    extra_compile_args={
+        "cxx": [
+            "-std=c++17",
+            "-O3"
+        ],         # C++ 编译选项
+        "nvcc": [
+            "-O3",
+            "-U__CUDA_NO_HALF_OPERATORS__",
+            "-U__CUDA_NO_HALF_CONVERSIONS__",
+            "-U__CUDA_NO_HALF2_OPERATORS__",
+            "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+            "--expt-relaxed-constexpr",
+            "--expt-extended-lambda",
+            "--use_fast_math",
+        ],  # NVCC 编译选项
+    },
+))
+
+
+def get_requirements() -> list[str]:
+    return []
+
+if __name__ == '__main__':
+    setup(
         name='fp4_gemm',
-        version='1.0.0' + revision,
+        version='1.0.0',
+        install_requires=get_requirements(),
         packages=['fp4_gemm', 'fp4_gemm/jit', 'fp4_gemm/jit_kernels'],
         package_data={
             'fp4_gemm': [
@@ -78,8 +104,6 @@ if __name__ == '__main__':
                 'include/cutlass/**/*',
             ]
         },
-        cmdclass={
-            'develop': PostDevelopCommand,
-            'build_py': CustomBuildPy,
-        },
+        ext_modules=ext_modules,
+        cmdclass={"build_ext": BuildExtension},  # 必须添加以支持混合编译
     )

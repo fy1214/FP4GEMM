@@ -8,6 +8,7 @@
 
 #include <cuda_fp8.h>
 #include "utils.cuh"
+#include "cuda_utils.h"
 
 #define ELTS_PER_THREAD 8
 
@@ -162,7 +163,7 @@ cvt_fp16_to_fp4(
 
 template <typename T>
 void invokeFP4Quantization(int m, int n, T const* input, float const* SFScale,
-                           int64_t* output, __nv_fp8_e4m3 const* SFOuput, bool useUE8M0,
+                           int64_t* output, __nv_fp8_e4m3* SFOuput, bool useUE8M0,
                            int multiProcessorCount, cudaStream_t stream) {
   // Grid, Block size.
   // Each thread converts 8 values.
@@ -186,13 +187,13 @@ void invokeFP4Quantization(int m, int n, T const* input, float const* SFScale,
 // Instantiate the function.
 template void invokeFP4Quantization(int m, int n, half const* input,
                                     float const* SFScale, int64_t* output,
-                                    __nv_fp8_e4m3 const* SFOuput, bool useUE8M0,
+                                    __nv_fp8_e4m3* SFOuput, bool useUE8M0,
                                     int multiProcessorCount,
                                     cudaStream_t stream);
 
 template void invokeFP4Quantization(int m, int n, __nv_bfloat16 const* input,
                                     float const* SFScale, int64_t* output,
-                                    __nv_fp8_e4m3 const* SFOuput, bool useUE8M0,
+                                    __nv_fp8_e4m3* SFOuput, bool useUE8M0,
                                     int multiProcessorCount,
                                     cudaStream_t stream);
 
@@ -209,7 +210,7 @@ void scaled_fp4_quant(torch::Tensor const& output,
       get_device_attribute(cudaDevAttrMultiProcessorCount, -1);
 
   auto input_sf_ptr = static_cast<float const*>(input_sf.data_ptr());
-  auto sf_out = static_cast<__nv_fp8_e4m3 const*>(output_sf.data_ptr());
+  auto sf_out = static_cast<__nv_fp8_e4m3*>(output_sf.data_ptr());
   auto output_ptr = static_cast<int64_t*>(output.data_ptr());
   const at::cuda::OptionalCUDAGuard device_guard(device_of(input));
   auto stream = at::cuda::getCurrentCUDAStream(input.get_device());

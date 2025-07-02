@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <torch/library.h>
+#include <torch/all.h>
 
 void scaled_fp4_quant(
     torch::Tensor const& output,

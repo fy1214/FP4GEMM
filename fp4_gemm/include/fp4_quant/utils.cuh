@@ -1,7 +1,6 @@
 #include <cuda_fp8.h>
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
-#include "cuda_utils.h"
 
 // Get type2 from type or vice versa (applied to half and bfloat16)
 template <typename T>

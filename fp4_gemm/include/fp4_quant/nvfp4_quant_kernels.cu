@@ -96,19 +96,22 @@ __device__ uint32_t cvt_warp_fp16_to_fp4(PackedVec<Type>& vec, float SFScaleVal,
   // TODO: use half as compute data type.
   float SFValue = SFScaleVal * (vecMax * reciprocal_approximate_ftz(6.0f));
   // 8 bits representation of the SF.
-  uint8_t fp8SFVal;
+  __nv_fp8_e4m3 fp8SFVal;
   // Write the SF to global memory (STG.8).
   if constexpr (UE8M0_SF) {
     // Extract the 8 exponent bits from float32.
     // float 32bits = 1 sign bit + 8 exponent bits + 23 mantissa bits.
     uint32_t tmp = reinterpret_cast<uint32_t&>(SFValue) >> 23;
-    fp8SFVal = tmp & 0xff;
+    fp8SFVal = __nv_fp8_e4m3(tmp & 0xff);
     // Convert back to fp32.
-    reinterpret_cast<__nv_fp8_e4m3&>(SFValue) = tmp << 23;
+    // Convert back to fp32.
+    reinterpret_cast<uint32_t&>(SFValue) = tmp << 23;
   } else {
     // Here SFValue is always positive, so E4M3 is the same as UE4M3.
     __nv_fp8_e4m3 tmp = __nv_fp8_e4m3(SFValue);
     reinterpret_cast<__nv_fp8_e4m3&>(fp8SFVal) = tmp;
+    // Convert back to fp32.
+    SFValue = float(tmp);
   }
   // Get the output scale.
   // Recipe: final_scale = reciprocal(fp32(fp8(SFValue * SFScaleVal))) *

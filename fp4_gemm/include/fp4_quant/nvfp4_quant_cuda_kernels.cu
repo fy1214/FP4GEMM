@@ -7,6 +7,7 @@
 #include <c10/cuda/CUDAGuard.h>
 
 #include <cuda_fp8.h>
+#include <cuda_fp4.h>
 #include "utils.cuh"
 #include "../cuda_utils.h"
 

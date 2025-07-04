@@ -148,46 +148,42 @@ cvt_fp16_to_fp4(
 }
 
 template <typename T>
-void invokeFP4Quantization(int m, int n, T const* input, float const* SFScale,
+void invokeFP4Quantization(int m, int n, T const* input,
                            int64_t* output, __nv_fp8_e4m3* SFOuput, bool useUE8M0,
                            int multiProcessorCount, cudaStream_t stream) {
   // Grid, Block size.
   // Each thread converts 8 values.
   dim3 block(std::min(int(n / ELTS_PER_THREAD), 512));
   // Get number of blocks per SM (assume we can fully utilize the SM).
-  // int const numBlocksPerSM = 2048 / block.x;
-  // dim3 grid(std::min(int(m), multiProcessorCount * numBlocksPerSM));
-  dim3 grid(std::min(int(m), 96));
+  int const numBlocksPerSM = 2048 / block.x;
+  dim3 grid(std::min(int(m), multiProcessorCount * numBlocksPerSM));
 
   // Launch the cvt kernel.
   if (useUE8M0) {
     cvt_fp16_to_fp4<T, true><<<grid, block, 0, stream>>>(
-        m, n, input, SFScale, reinterpret_cast<uint32_t*>(output),
+        m, n, input, nullptr, reinterpret_cast<uint32_t*>(output),
         reinterpret_cast<__nv_fp8_e4m3*>(SFOuput));
   } else {
     cvt_fp16_to_fp4<T, false><<<grid, block, 0, stream>>>(
-        m, n, input, SFScale, reinterpret_cast<uint32_t*>(output),
+        m, n, input, nullptr, reinterpret_cast<uint32_t*>(output),
         reinterpret_cast<__nv_fp8_e4m3*>(SFOuput));
   }
 }
 
 // Instantiate the function.
 template void invokeFP4Quantization(int m, int n, half const* input,
-                                    float const* SFScale, int64_t* output,
-                                    __nv_fp8_e4m3* SFOuput, bool useUE8M0,
-                                    int multiProcessorCount,
+                                    int64_t* output, __nv_fp8_e4m3* SFOuput, 
+                                    bool useUE8M0, int multiProcessorCount,
                                     cudaStream_t stream);
 
 template void invokeFP4Quantization(int m, int n, __nv_bfloat16 const* input,
-                                    float const* SFScale, int64_t* output,
-                                    __nv_fp8_e4m3* SFOuput, bool useUE8M0,
-                                    int multiProcessorCount,
+                                    int64_t* output, __nv_fp8_e4m3* SFOuput, 
+                                    bool useUE8M0, int multiProcessorCount,
                                     cudaStream_t stream);
 
 void scaled_fp4_quant(torch::Tensor const& output,
                       torch::Tensor const& input,
-                      torch::Tensor const& output_sf,
-                      torch::Tensor const& input_sf) {
+                      torch::Tensor const& output_sf) {
   int32_t m = input.size(0);
   int32_t n = input.size(1);
 
@@ -196,7 +192,6 @@ void scaled_fp4_quant(torch::Tensor const& output,
   int multiProcessorCount =
       get_device_attribute(cudaDevAttrMultiProcessorCount, -1);
 
-  auto input_sf_ptr = static_cast<float const*>(input_sf.data_ptr());
   auto sf_out = static_cast<__nv_fp8_e4m3*>(output_sf.data_ptr());
   auto output_ptr = static_cast<int64_t*>(output.data_ptr());
   const at::cuda::OptionalCUDAGuard device_guard(device_of(input));
@@ -208,13 +203,13 @@ void scaled_fp4_quant(torch::Tensor const& output,
   switch (input.scalar_type()) {
     case torch::kHalf: {
       auto input_ptr = reinterpret_cast<half const*>(input.data_ptr());
-      invokeFP4Quantization(m, n, input_ptr, input_sf_ptr, output_ptr, sf_out,
+      invokeFP4Quantization(m, n, input_ptr, output_ptr, sf_out,
                             useUE8M0, multiProcessorCount, stream);
       break;
     }
     case torch::kBFloat16: {
       auto input_ptr = reinterpret_cast<__nv_bfloat16 const*>(input.data_ptr());
-      invokeFP4Quantization(m, n, input_ptr, input_sf_ptr, output_ptr, sf_out,
+      invokeFP4Quantization(m, n, input_ptr, output_ptr, sf_out,
                             useUE8M0, multiProcessorCount, stream);
       break;
     }

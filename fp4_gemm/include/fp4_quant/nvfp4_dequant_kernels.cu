@@ -25,7 +25,7 @@ __launch_bounds__(512, 4) cvt_fp4_to_fp16(
 #else
 cvt_fp4_to_fp16(
 #endif
-    int32_t numRows, int32_t numCols, uint32_t const* in, __nv_fp8_e4m3 const* SFScale,T* out) {
+    int32_t numRows, int32_t numCols, uint32_t const* in, __nv_fp8_e4m3 const* SFScale,Type* out) {
 #if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 1000)
 
   // Input tensor row/col loops.
@@ -60,18 +60,16 @@ void invokeFP4deQuantization(int m, int n, uint32_t const* input, __nv_fp8_e4m3 
   // Each thread converts 8 values.
   dim3 block(std::min(int(n), 512));
   // Get number of blocks per SM (assume we can fully utilize the SM).
-  // int const numBlocksPerSM = 2048 / block.x;
+  int const numBlocksPerSM = 2048 / block.x;
   dim3 grid(std::min(int(m), multiProcessorCount * numBlocksPerSM));
 
   // Launch the cvt kernel.
   if (useUE8M0) {
     cvt_fp4_to_fp16<T, true><<<grid, block, 0, stream>>>(
-        m, n, input, SFScale, reinterpret_cast<uint32_t*>(output),
-        reinterpret_cast<__nv_fp8_e4m3*>(SFOuput));
+        m, n, input, SFScale, reinterpret_cast<uint32_t*>(output));
   } else {
     cvt_fp4_to_fp16<T, false><<<grid, block, 0, stream>>>(
-        m, n, input, SFScale, reinterpret_cast<uint32_t*>(output),
-        reinterpret_cast<__nv_fp8_e4m3*>(SFOuput));
+        m, n, input, SFScale, reinterpret_cast<uint32_t*>(output));
   }
 }
 

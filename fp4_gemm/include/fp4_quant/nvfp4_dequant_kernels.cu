@@ -118,13 +118,13 @@ void scaled_fp4_dequant(torch::Tensor const& output,
 
   switch (output.scalar_type()) {
     case torch::kHalf: {
-      auto output_ptr = reinterpret_cast<half const*>(output.data_ptr());
+      auto output_ptr = reinterpret_cast<half*>(output.data_ptr());
       invokeFP4deQuantization(m, n, input_ptr, input_sf_ptr, output_ptr,
                             useUE8M0, multiProcessorCount, stream);
       break;
     }
     case torch::kBFloat16: {
-      auto output_ptr = reinterpret_cast<__nv_bfloat16 const*>(output.data_ptr());
+      auto output_ptr = reinterpret_cast<__nv_bfloat16*>(output.data_ptr());
       invokeFP4deQuantization(m, n, input_ptr, input_sf_ptr, output_ptr,
                             useUE8M0, multiProcessorCount, stream);
       break;

@@ -138,12 +138,12 @@ cvt_fp16_to_fp4(
   for (int rowIdx = blockIdx.x; rowIdx < numRows; rowIdx += gridDim.x) {
     for (int colIdx = threadIdx.x; colIdx < numCols / CVT_FP4_SF_VEC_SIZE;
          colIdx += blockDim.x) {
-      int64_t inOffset = rowIdx * (numCols / CVT_FP4_SF_VEC_SIZE) + colIdx;
-      int64_t outOffset = inOffset;
+      int64_t inOffset = rowIdx * numCols + colIdx * CVT_FP4_SF_VEC_SIZE;
+      int64_t outOffset = rowIdx * (numCols / CVT_FP4_ELTS_PER_THREAD) + colIdx * CVT_FP4_NUM_THREADS_PER_SF;
       const PackedVec* in_vec_ptr = reinterpret_cast<PackedVec const*>(in);
       // load 128 twice
       for (int i = 0; i < CVT_FP4_NUM_THREADS_PER_SF; i++) {
-        PackedVec in_vec = in_vec_ptr[i];
+        PackedVec in_vec = in_vec_ptr[inOffset + i];
         // Get the output tensor offset.
         // Same as inOffset because 8 elements are packed into one uint32_t.
         auto& out_pos = out[outOffset + i];

@@ -3,6 +3,7 @@
 
 #include <torch/library.h>
 #include <torch/version.h>
+#include <torch/extension.h>
 
 // A version of the TORCH_LIBRARY macro that expands the NAME, i.e. so NAME
 // could be a macro instead of a literal token.

@@ -12,4 +12,4 @@ if __name__ == '__main__':
 
     out = torch.empty((m, n // 8), device='cuda', dtype=torch.int32)
     out_scale = torch.empty((m, n // 8), device='cuda', dtype=torch.float8_e4m3fn)
-    torch.ops.fp4_gemm.scaled_fp4_quant(out, x, out_scale, x_scale)
+    fp4_gemm.scaled_fp4_quant(out, x, out_scale, x_scale)

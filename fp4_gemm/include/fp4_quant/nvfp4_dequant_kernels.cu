@@ -17,6 +17,15 @@
 constexpr int CVT_FP4_ELTS_PER_TIME = 8;
 constexpr int CVT_FP4_SF_VEC_SIZE = 16;
 
+__device__ __nv_bfloat16 half_to_bf16_fast(__half h) {
+    unsigned short fp16_bits = *reinterpret_cast<unsigned short*>(&h);
+    unsigned int fp32_bits = ((fp16_bits & 0x8000) << 16) |  // 符号位
+                            ((fp16_bits & 0x7C00) << 13) |  // 指数位
+                            ((fp16_bits & 0x03FF) << 13);   // 尾数位扩展
+    unsigned short bf16_bits = fp32_bits >> 16;             // 截断为 BF16
+    return *reinterpret_cast<__nv_bfloat16*>(&bf16_bits);
+}
+
 // Use UE4M3 by default.
 template <class Type, bool UE8M0_SF = false>
 __global__ void
@@ -47,7 +56,7 @@ cvt_fp4_to_fp16(
         half half_elet = static_cast<half>(half_raw_elet);
         half res = __hmul(half_scale, half_elet);
         if constexpr (std::is_same_v<Type, __nv_bfloat16>) {
-            out[outOffset + i] = reinterpret_cast<__nv_bfloat16*>(res)[0];
+            out[outOffset + i] = half_to_bf16_fast(res);
         }else {
             out[outOffset + i] = res;
         }

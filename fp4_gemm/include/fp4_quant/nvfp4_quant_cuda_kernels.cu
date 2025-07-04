@@ -38,7 +38,6 @@ inline __device__ uint32_t fp32_vec_to_e2m1(float2 (&array)[4]) {
 template <class Type, bool UE8M0_SF = false>
 __device__ uint32_t cvt_warp_fp16_to_fp4(PackedVec<Type>& vec, float SFScaleVal,
                                          __nv_fp8_e4m3* SFout) {
-#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 1000)
   // Get absolute maximum values among the local 8 values.
   auto localMax = __habs2(vec.elts[0]);
 
@@ -107,9 +106,6 @@ __device__ uint32_t cvt_warp_fp16_to_fp4(PackedVec<Type>& vec, float SFScaleVal,
 
   // Write the e2m1 values to global memory.
   return e2m1Vec;
-#else
-  return 0;
-#endif
 }
 
 // Use UE4M3 by default.
@@ -122,7 +118,6 @@ cvt_fp16_to_fp4(
 #endif
     int32_t numRows, int32_t numCols, Type const* in, float const* SFScale,
     uint32_t* out, __nv_fp8_e4m3* SFout) {
-#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 1000)
   using PackedVec = PackedVec<Type>;
   static constexpr int CVT_FP4_NUM_THREADS_PER_SF =
       (CVT_FP4_SF_VEC_SIZE / CVT_FP4_ELTS_PER_THREAD);  // 2
@@ -150,7 +145,6 @@ cvt_fp16_to_fp4(
           cvt_warp_fp16_to_fp4<Type, UE8M0_SF>(in_vec, SFScaleVal, sf_out);
     }
   }
-#endif
 }
 
 template <typename T>

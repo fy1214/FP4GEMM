@@ -133,26 +133,21 @@ cvt_fp16_to_fp4(
   // Note SFScale is the same as next GEMM's alpha, which is
   // (448.f / (Alpha_A / 6.f)).
   float const SFScaleVal = SFScale == nullptr ? 1.0f : SFScale[0];
+  const PackedVec* in_vec_ptr = reinterpret_cast<PackedVec const*>(in);
 
   // Input tensor row/col loops.
   for (int rowIdx = blockIdx.x; rowIdx < numRows; rowIdx += gridDim.x) {
-    for (int colIdx = threadIdx.x; colIdx < numCols / CVT_FP4_SF_VEC_SIZE;
+    for (int colIdx = threadIdx.x; colIdx < numCols / CVT_FP4_ELTS_PER_THREAD;
          colIdx += blockDim.x) {
-      int64_t inOffset = rowIdx * numCols + colIdx * CVT_FP4_SF_VEC_SIZE;
-      int64_t outOffset = rowIdx * (numCols / CVT_FP4_ELTS_PER_THREAD) + colIdx * CVT_FP4_NUM_THREADS_PER_SF;
-      const PackedVec* in_vec_ptr = reinterpret_cast<PackedVec const*>(in);
-      // load 128 twice
-      for (int i = 0; i < CVT_FP4_NUM_THREADS_PER_SF; i++) {
-        PackedVec in_vec = in_vec_ptr[inOffset + i];
-        // Get the output tensor offset.
-        // Same as inOffset because 8 elements are packed into one uint32_t.
-        auto& out_pos = out[outOffset + i];
-
-        auto sf_out = &SFout[outOffset + i];
-
-        out_pos =
-            cvt_warp_fp16_to_fp4<Type, UE8M0_SF>(in_vec, SFScaleVal, sf_out);
-      }
+      int64_t inOffset = rowIdx * (numCols / CVT_FP4_ELTS_PER_THREAD) + colIdx;
+      PackedVec in_vec = reinterpret_cast<PackedVec const*>(in)[inOffset];
+      // Get the output tensor offset.
+      // Same as inOffset because 8 elements are packed into one uint32_t.
+      int64_t outOffset = inOffset;
+      auto& out_pos = out[outOffset];
+      auto sf_out = &SFout[outOffset + i];
+      out_pos =
+          cvt_warp_fp16_to_fp4<Type, UE8M0_SF>(in_vec, SFScaleVal, sf_out);
     }
   }
 #endif
@@ -166,8 +161,9 @@ void invokeFP4Quantization(int m, int n, T const* input, float const* SFScale,
   // Each thread converts 8 values.
   dim3 block(std::min(int(n / ELTS_PER_THREAD), 512));
   // Get number of blocks per SM (assume we can fully utilize the SM).
-  int const numBlocksPerSM = 2048 / block.x;
-  dim3 grid(std::min(int(m), multiProcessorCount * numBlocksPerSM));
+  // int const numBlocksPerSM = 2048 / block.x;
+  // dim3 grid(std::min(int(m), multiProcessorCount * numBlocksPerSM));
+  dim3 grid(std::min(int(m), 96));
 
   // Launch the cvt kernel.
   if (useUE8M0) {

@@ -145,7 +145,7 @@ cvt_fp16_to_fp4(
       // Same as inOffset because 8 elements are packed into one uint32_t.
       int64_t outOffset = inOffset;
       auto& out_pos = out[outOffset];
-      auto sf_out = &SFout[outOffset + i];
+      auto sf_out = &SFout[outOffset];
       out_pos =
           cvt_warp_fp16_to_fp4<Type, UE8M0_SF>(in_vec, SFScaleVal, sf_out);
     }

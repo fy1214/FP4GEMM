@@ -34,17 +34,17 @@ cvt_fp4_to_fp16(
       int64_t inOffset = rowIdx * numCols + colIdx;
       int64_t outOffset = rowIdx * numCols * CVT_FP4_ELTS_PER_TIME + colIdx * CVT_FP4_ELTS_PER_TIME;
       // the scale from fp8 to half
-      __nv_fp8_e4m3 e4m3_scale_val = SFScale[i];
-      __nv_fp8_storage_t e4m3_scale_storage = __nv_fp8_e4m3_to_storage(e4m3_scale_val);
-      __half_raw half_scale_raw = __nv_cvt_fp8_to_halfraw(e4m3_scale_storage, __NV_E4M3);
-      half half_scale = reinterpret_cast<half*>(half_scale_raw);
+      __nv_fp8_e4m3 e4m3_scale_val = SFScale[inOffset];
+      // __nv_fp8_storage_t e4m3_scale_storage = __nv_fp8_e4m3_to_storage(e4m3_scale_val);
+      // __half_raw half_scale_raw = __nv_cvt_fp8_to_halfraw(e4m3_scale_storage, __NV_E4M3);
+      half half_scale = e4m3_scale_val;
 
       // the input from fp4 to half
       __nv_fp4_storage_t* tmp = reinterpret_cast<__nv_fp4_storage_t const*>(in + inOffset);
       for (int i = 0; i < CVT_FP4_ELTS_PER_TIME; i++) {
         __nv_fp4_storage_t fp4_elet = tmp[i];
         __half_raw half_raw_elet = __nv_cvt_fp4_to_halfraw(fp4_elet, __NV_E2M1);
-        half half_elet = reinterpret_cast<half*>(half_raw_elet);
+        half half_elet = reinterpret_cast<half*>(half_raw_elet)[0];
         half res = __hmul(half_scale, half_elet);
         out[outOffset + i] = reinterpret_cast<T*>(res)[0];
       }

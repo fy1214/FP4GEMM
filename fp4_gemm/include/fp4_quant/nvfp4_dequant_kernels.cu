@@ -40,13 +40,13 @@ cvt_fp4_to_fp16(
       half half_scale = static_cast<__half>(e4m3_scale_val); ;
 
       // the input from fp4 to half
-      __nv_fp4_storage_t* tmp = reinterpret_cast<__nv_fp4_storage_t*>(in + inOffset);
+      __nv_fp4_storage_t const* tmp = reinterpret_cast<__nv_fp4_storage_t const*>(in + inOffset);
       for (int i = 0; i < CVT_FP4_ELTS_PER_TIME; i++) {
         __nv_fp4_storage_t fp4_elet = tmp[i];
         __half_raw half_raw_elet = __nv_cvt_fp4_to_halfraw(fp4_elet, __NV_E2M1);
         half half_elet = static_cast<half>(half_raw_elet);
         half res = __hmul(half_scale, half_elet);
-        out[outOffset + i] = static_cast<Type>(res);
+        out[outOffset + i] = reinterpret_cast<Type*>(res)[0];
       }
     }
   }

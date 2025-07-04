@@ -66,10 +66,10 @@ void invokeFP4deQuantization(int m, int n, uint32_t const* input, __nv_fp8_e4m3 
   // Launch the cvt kernel.
   if (useUE8M0) {
     cvt_fp4_to_fp16<T, true><<<grid, block, 0, stream>>>(
-        m, n, input, SFScale, reinterpret_cast<uint32_t*>(output));
+        m, n, input, SFScale, reinterpret_cast<T*>(output));
   } else {
     cvt_fp4_to_fp16<T, false><<<grid, block, 0, stream>>>(
-        m, n, input, SFScale, reinterpret_cast<uint32_t*>(output));
+        m, n, input, SFScale, reinterpret_cast<T*>(output));
   }
 }
 

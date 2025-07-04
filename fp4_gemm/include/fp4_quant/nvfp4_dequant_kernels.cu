@@ -46,7 +46,11 @@ cvt_fp4_to_fp16(
         __half_raw half_raw_elet = __nv_cvt_fp4_to_halfraw(fp4_elet, __NV_E2M1);
         half half_elet = static_cast<half>(half_raw_elet);
         half res = __hmul(half_scale, half_elet);
-        out[outOffset + i] = reinterpret_cast<Type*>(res)[0];
+        if constexpr (std::is_same_v(Type, __nv_bfloat16)) {
+            out[outOffset + i] = reinterpret_cast<__nv_bfloat16*>(res)[0];
+        }else {
+            out[outOffset + i] = res;
+        }
       }
     }
   }

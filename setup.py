@@ -64,8 +64,8 @@ ext_modules = []
 ext_modules.append(CUDAExtension(
     name="fp4_gemm",
     sources=[
-        #"fp4_gemm/include/fp4_quant/nvfp4_quant_kernels.cu",
         "fp4_gemm/include/fp4_quant/nvfp4_quant_cuda_kernels.cu",
+        "fp4_gemm/include/fp4_quant/nvfp4_dequant_cuda_kernels.cu",
         "fp4_gemm/include/cuda_utils_kernels.cu",
         "fp4_gemm/include/torch_bindings.cpp"
     ],

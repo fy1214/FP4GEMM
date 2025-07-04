@@ -5,7 +5,7 @@ import torch
 import fp4_gemm
 
 if __name__ == '__main__':
-    m, n = 1024, 512
+    m, n = 128, 128
 
     x = torch.rand((m, n), device='cuda', dtype=torch.bfloat16)
     x_scale = torch.tensor([1], device='cuda', dtype=torch.float32)
@@ -13,3 +13,6 @@ if __name__ == '__main__':
     out = torch.empty((m, n // 8), device='cuda', dtype=torch.int32)
     out_scale = torch.empty((m, n // 8), device='cuda', dtype=torch.float8_e4m3fn)
     fp4_gemm.scaled_fp4_quant(out, x, out_scale, x_scale)
+
+    print(out)
+    print(out_scale)

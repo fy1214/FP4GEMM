@@ -66,6 +66,7 @@ ext_modules.append(CUDAExtension(
     sources=[
         "fp4_gemm/include/fp4_quant/nvfp4_quant_cuda_kernels.cu",
         "fp4_gemm/include/fp4_quant/nvfp4_dequant_kernels.cu",
+        "fp4_gemm/include/fp8_gemm/fp8_gemm.cu",
         "fp4_gemm/include/cuda_utils_kernels.cu",
         "fp4_gemm/include/torch_bindings.cpp"
     ],
@@ -74,7 +75,9 @@ ext_modules.append(CUDAExtension(
     extra_compile_args={
         "cxx": [
             "-std=c++17",
-            "-O3"
+            "-O3",
+            "-I./" + third_party_include_dirs[0],
+            "-I./" + third_party_include_dirs[1]
         ],         # C++ 编译选项
         "nvcc": [
             "-O3",
@@ -107,5 +110,8 @@ if __name__ == '__main__':
             ]
         },
         ext_modules=ext_modules,
-        cmdclass={"build_ext": BuildExtension},  # 必须添加以支持混合编译
+        cmdclass={
+            # "develop": PostDevelopCommand,
+            "build_ext": BuildExtension,
+        },  # 必须添加以支持混合编译
     )

@@ -10,4 +10,5 @@
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("scaled_fp4_quant", &scaled_fp4_quant, "scaled fp4 quant act (CUDA)");
     m.def("scaled_fp4_dequant", &scaled_fp4_dequant, "scaled fp4 dequant act (CUDA)");
+    m.def("fp8_gemm_cute", &fp8_gemm_cute, "scaled fp8 gemm act (CUDA)");
 }

@@ -13,3 +13,5 @@ void scaled_fp4_quant(
 void scaled_fp4_dequant(torch::Tensor const& output,
                         torch::Tensor const& input,
                         torch::Tensor const& input_sf);
+
+void fp8_gemm_cute(torch::Tensor A, torch::Tensor B, torch::Tensor C);

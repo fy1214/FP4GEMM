@@ -70,7 +70,7 @@ __global__ void fp8_gemm_cute_kernel(typename FlashAttnConfig_::T *pA,
   }
 }
 
-void flash_attn_cute(torch::Tensor A, torch::Tensor B, torch::Tensor C) {
+void fp8_gemm_cute(torch::Tensor A, torch::Tensor B, torch::Tensor C) {
   
   using config = Flash_kernel_traits;
   using T = config::Type;

@@ -11,6 +11,7 @@ third_party_include_dirs = (
     'third-party/cutlass/include/cute',
     'third-party/cutlass/include/cutlass',
 )
+third_party_include_dir = 'third-party/cutlass/include'
 
 
 class PostDevelopCommand(develop):
@@ -76,8 +77,7 @@ ext_modules.append(CUDAExtension(
         "cxx": [
             "-std=c++17",
             "-O3",
-            "-I./" + third_party_include_dirs[0],
-            "-I./" + third_party_include_dirs[1]
+            "-I./" + third_party_include_dir
         ],         # C++ 编译选项
         "nvcc": [
             "-O3",
@@ -88,6 +88,7 @@ ext_modules.append(CUDAExtension(
             "--expt-relaxed-constexpr",
             "--expt-extended-lambda",
             "--use_fast_math",
+            "-I./" + third_party_include_dir
         ],  # NVCC 编译选项
     },
 ))

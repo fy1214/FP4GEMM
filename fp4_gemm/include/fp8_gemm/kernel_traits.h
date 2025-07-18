@@ -34,6 +34,7 @@ struct Flash_kernel_traits {
     static constexpr int kBlockK = kBlockK_;
     static constexpr int kStage = kStage_;
 
+    // g -> s
     using GmemCopyAtom = Copy_Atom<AutoVectorizingCopyWithAssumedAlignment<sizeof(uint128_t)>, Type>; 
     static constexpr int GmemValsPerLoad = sizeof(uint128_t) / sizeof(A_type); // 每次vector加载128位，可以加载几个元素。128/8=16
     static constexpr int GmemThreadsPerRow = kBlockK / GmemValsPerLoad; // each thread reads 128 bit，计算得到需要几个线程  128/16=8  
@@ -47,14 +48,18 @@ struct Flash_kernel_traits {
         make_layout(Shape<_1, Int<GmemValsPerLoad>>{}, GenRowMajor{}))
     );  // ValLa
 
+    // MMA
     using SmemCopyAtom = Copy_Atom<SM75_U32x4_LDSM_N, Type>;
-
     using MMA_Atom = MMA_Atom<
         SM120_16x8x32_TN<A_type, B_type, C_type>
     >;
     using ValLayoutMNK = Layout<Shape<_2, _8, _16>>;
     using TiledMma = TiledMMA<
         MMA_Atom,
-        Layout<Shape<Int<kNWarps>,_1,_1>>,  // 4x1x1 or 8x1x1 thread group
-        Tile<Int<32 * kNWarps>, _16, _32>>;
+        Layout<Shape<_1,_1,Int<kNWarps>>>,  // 1x1x4 or 1x1x8 thread group
+        Tile<_16, _16, Int<32 * kNWarps>>>;
+
+    // r -> s
+    using SmemCopyAtomO =
+      Copy_Atom<AutoVectorizingCopyWithAssumedAlignment<sizeof(uint128_t)>, OUT_TYPE>;
 };

@@ -24,6 +24,7 @@ __global__ void fp8_gemm_cute_kernel(typename FlashAttnConfig_::Type *pA,
   using TiledCopy = typename FlashAttnConfig_::TiledCopyABC;
   using SmemCopyAtom = typename FlashAttnConfig_::SmemCopyAtom;
   using TiledMMA = typename FlashAttnConfig_::TiledMma;
+  using SmemCopyAtomO = typename FlashAttnConfig_::SmemCopyAtomO;
 
   const int bx = blockIdx.x, by = blockIdx.y;
   const int tx = threadIdx.x;
@@ -47,20 +48,20 @@ __global__ void fp8_gemm_cute_kernel(typename FlashAttnConfig_::Type *pA,
   */
   
   Tensor gA = local_tile(A, make_tile(Int<BM>{}, Int<BK>{}),
-                         make_coord(iy, _)); // (BM, BK, num_tile_k)
+                         make_coord(bx, _)); // (BM, BK, num_tile_k)
   Tensor gB = local_tile(B, make_tile(Int<BN>{}, Int<BK>{}),
-                         make_coord(ix, _)); // (BN, BK, num_tile_k)
+                         make_coord(by, _)); // (BN, BK, num_tile_k)
   Tensor gD = local_tile(D, make_tile(Int<BM>{}, Int<BN>{}),
-                         make_coord(iy, ix)); // (BM, BN)
+                         make_coord(bx, by)); // (BM, BN)
 
   __shared__ T psA[BM * BK * kStage], psB[BN * BK * kStage];
 
   auto sA = make_tensor(
       make_smem_ptr(psA),
-      make_layout(make_shape(Int<BM>{}, Int<BK>{}, Int<KStage>{}), GenRowMajor{}));
+      make_layout(make_shape(Int<BM>{}, Int<BK>{}, Int<kStage>{}), GenRowMajor{}));
   auto sB = make_tensor(
       make_smem_ptr(psB),
-      make_layout(make_shape(Int<BN>{}, Int<BK>{}, Int<KStage>{}), GenRowMajor{}));
+      make_layout(make_shape(Int<BN>{}, Int<BK>{}, Int<kStage>{}), GenRowMajor{}));
   
   // global memory -> shared memory
   TiledCopy tiled_copy;
@@ -75,18 +76,19 @@ __global__ void fp8_gemm_cute_kernel(typename FlashAttnConfig_::Type *pA,
   auto thr_mma = tiled_mma.get_slice(tx);
   auto tCrA = thr_mma.partition_fragment_A(gA(_, _, 0)); // (MMA, MMA_M, MMA_K)
   auto tCrB = thr_mma.partition_fragment_B(gB(_, _, 0)); // (MMA, MMA_N, MMA_K)
-  auto tCrD = thr_mma.partition_fragment_C(gD);          // (MMA, MMA_M, MMA_N)
+  // auto tCrD = thr_mma.partition_fragment_C(gD);          // (MMA, MMA_M, MMA_N)
+  auto tCrD = partition_fragment_C(tiled_mma, Shape<Int<BM>, Int<BN>>{});
   clear(tCrD);
 
   // shared memory -> register memory in TiledMMA
   auto tiled_s2r_copy_A = make_tiled_copy_A(SmemCopyAtom{}, tiled_mma);
   auto s2r_thr_copy_a = tiled_s2r_copy_A.get_slice(tx);
-  auto tAsA = s2r_thr_copy_a.partition_S(sA);     // (CPY, CPY_M, CPY_K, kStage)
+  auto tArA = s2r_thr_copy_a.partition_S(sA);     // (CPY, CPY_M, CPY_K, kStage)
   auto tCrA_view = s2r_thr_copy_a.retile_D(tCrA); // (CPY, CPY_M, CPY_K)
 
   auto tiled_s2r_copy_B = make_tiled_copy_B(SmemCopyAtom{}, tiled_mma);
   auto s2r_thr_copy_b = tiled_s2r_copy_B.get_slice(tx);
-  auto tBsB = s2r_thr_copy_b.partition_S(sB);     // (CPY, CPY_N, CPY_K, kStage)
+  auto tBrB = s2r_thr_copy_b.partition_S(sB);     // (CPY, CPY_N, CPY_K, kStage)
   auto tCrB_view = s2r_thr_copy_b.retile_D(tCrB); // (CPY, CPY_N, CPY_K)
 
   if (thread0()) {
@@ -104,11 +106,14 @@ __global__ void fp8_gemm_cute_kernel(typename FlashAttnConfig_::Type *pA,
     print("tiled_s2r_copy_A: "); print(tiled_s2r_copy_A); print("\n");
     print("tAsA: "); print(tAsA.layout()); print("\n");
     print("tCrA_view: "); print(tCrA_view.layout()); print("\n");
-  }
 
-/**
-  // copy A into smem
-  copy(tiled_copy, tAgA, tAsA);
+    print("tiled_s2r_copy_B: "); print(tiled_s2r_copy_B); print("\n");
+    print("tBsB: "); print(tBsB.layout()); print("\n");
+    print("tCrB_view: "); print(tCrB_view.layout()); print("\n");
+  }
+  
+  auto old_layout = tAsA.layout();
+  auto new_layout = recast_layout<cutlass::float_e4m3_t,uint128_t>(old_layout);
 
   // PREFETCH
   // submit kStage - 1 tile
@@ -132,17 +137,16 @@ __global__ void fp8_gemm_cute_kernel(typename FlashAttnConfig_::Type *pA,
   cp_async_wait<kStage - 2>();
   __syncthreads();
 
-  int ik = 0;
   // smem -> reg
   // tAsA: (CPY, CPY_M, CPY_K, kStage) tCrA_view: (CPY, CPY_M, CPY_K)
-  cute::copy(s2r_tiled_copy_a, tAsA(_, _, ik, ismem_read), tCrA_view(_, _, ik));
-  cute::copy(s2r_tiled_copy_b, tBsB(_, _, ik, ismem_read), tCrB_view(_, _, ik));
+  cute::copy(tiled_s2r_copy_A, tAsA(_, 0, _, ismem_read), tCrA_view(_, 0, _));
+  cute::copy(tiled_s2r_copy_B, tBsB(_, 0, _, ismem_read), tCrB_view(_, 0, _));
 
   // loop over k: i. load tile, ii. mma
   int ntile = k / BK;
 #pragma unroll 1
   for (int itile = 0; itile < ntile; ++itile) {
-    int nk = size<2>(tCrA); // (MMA, MMA_M, MMA_K)
+    int nk = size<1>(tCrA); // (MMA, MMA_M, MMA_K)
     
 #pragma unroll
     for (int ik = 0; ik < nk; ++ik) {
@@ -156,32 +160,39 @@ __global__ void fp8_gemm_cute_kernel(typename FlashAttnConfig_::Type *pA,
 
       // shm -> reg s[itile][ik + 1] -> r[ik + 1]
       // tAsA: (CPY, CPY_M, CPY_K, kStage), tCrA_view: (CPY, CPY_M, CPY_K)
-      cute::copy(tiled_s2r_copy_A, tAsA(_, _, ik_next, ismem_read),
-                 tCrA_view(_, _, ik_next));
+      cute::copy(tiled_s2r_copy_A, tAsA(_, ik_next, _, ismem_read),
+                 tCrA_view(_, ik_next, _));
       // tBsB: (CPY, CPY_M, CPY_K, kStage), tCrB_view: (CPY, CPY_M, CPY_K)
-      cute::copy(tiled_s2r_copy_B, tBsB(_, _, ik_next, ismem_read),
-                 tCrB_view(_, _, ik_next));
+      cute::copy(tiled_s2r_copy_B, tBsB(_, ik_next, _, ismem_read),
+                 tCrB_view(_, ik_next, _));
       
       if (ik == 0) {
         if (itile_to_read < ntile) {
-          cute::copy(g2s_tiled_copy_a, tAgA_copy(_, _, _, itile_to_read),
-                     tAsA_copy(_, _, _, ismem_write));
-          cute::copy(g2s_tiled_copy_b, tBgB_copy(_, _, _, itile_to_read),
-                     tBsB_copy(_, _, _, ismem_write));
+          cute::copy(g2s_thr_copy, tAgA(_, _, _, itile_to_read),
+                     tAsA(_, _, _, ismem_write));
+          cute::copy(g2s_thr_copy, tBgB(_, _, _, itile_to_read),
+                     tBsB(_, _, _, ismem_write));
           ++itile_to_read;
           ismem_write = (ismem_write + 1) % kStage;
         }
 
         cp_async_fence();
       }
+
+      cute::gemm(tiled_mma, tCrD, tCrA(_, ik, _), tCrB(_, ik, _), tCrD);
     }
   }
-  **/
+  // copy O back to gmem
+  auto tiled_r2s_copy_O = make_tiled_copy_C(SmemCopyAtomO{}, tiled_mma);
+  auto thr_r2s_copy_O = tiled_r2s_copy_O.get_slice(tx);
+  auto tXrD = thr_r2s_copy_O.retile_S(tCrD);
+  auto tXsD = thr_r2s_copy_O.partition_D(gD);
+  cute::copy(tiled_r2s_copy_O, tXrD, tXsD);
 }
 
 void fp8_gemm_cute(torch::Tensor A, torch::Tensor B, torch::Tensor D) {
   
-  using config = Flash_kernel_traits<128,128,128,4,
+  using config = Flash_kernel_traits<128,128,128,4,2,
     cutlass::float_e4m3_t,cutlass::float_e4m3_t,float>;
   using T = config::Type;
   using O_T = config::OUT_TYPE;
